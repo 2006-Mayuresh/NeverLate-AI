@@ -1,0 +1,126 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --shadow-premium: 0 12px 30px -8px rgba(13, 148, 136, 0.05), 0 4px 14px -5px rgba(2, 132, 199, 0.03);
+  --shadow-premium-hover: 0 25px 50px -12px rgba(6, 182, 212, 0.15), 0 8px 24px -8px rgba(132, 204, 22, 0.1), 0 0 1px 0 rgba(6, 182, 212, 0.15);
+  --shadow-glow-teal: 0 0 25px -4px rgba(13, 148, 136, 0.45);
+  --shadow-glow-purple: 0 0 25px -4px rgba(168, 85, 247, 0.4);
+  --shadow-glow-cyan: 0 0 25px -4px rgba(6, 182, 212, 0.45);
+  --shadow-glow-lime: 0 0 25px -4px rgba(132, 204, 22, 0.45);
+}
+
+/* Custom interactive premium utility classes */
+.premium-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: var(--shadow-premium);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.premium-card:hover {
+  transform: translateY(-5px) scale(1.01);
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(6, 182, 212, 0.3);
+  box-shadow: var(--shadow-premium-hover);
+}
+
+/* Glowing container effects */
+.glow-teal-hover:hover {
+  box-shadow: var(--shadow-glow-teal);
+  border-color: rgba(13, 148, 136, 0.5);
+}
+
+.glow-purple-hover:hover {
+  box-shadow: var(--shadow-glow-purple);
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+.glow-cyan-hover:hover {
+  box-shadow: var(--shadow-glow-cyan);
+  border-color: rgba(6, 182, 212, 0.5);
+}
+
+.glow-lime-hover:hover {
+  box-shadow: var(--shadow-glow-lime);
+  border-color: rgba(132, 204, 22, 0.5);
+}
+
+/* Premium scale press effects on buttons */
+.btn-animate {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-animate:hover {
+  transform: translateY(-2px) scale(1.03);
+  filter: brightness(1.08);
+}
+
+.btn-animate:active {
+  transform: translateY(1px) scale(0.97);
+}
+
+/* Gentle floating animations for decorative circles */
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-15px) scale(1.05); }
+}
+
+@keyframes float-reverse {
+  0%, 100% { transform: translateY(0px) scale(1.05); }
+  50% { transform: translateY(15px) scale(1); }
+}
+
+.animate-float {
+  animation: float-slow 8s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: float-reverse 10s ease-in-out infinite;
+}
+
+/* Custom scrollbar styling to match the clean layout */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Dark Mode Custom Styles and Overrides */
+.dark body {
+  background-color: #070b19;
+}
+
+.dark ::selection {
+  background-color: rgba(6, 182, 212, 0.3);
+}
+
+/* Dark scrollbars */
+.dark ::-webkit-scrollbar-thumb {
+  background: #1e293b;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+

@@ -1,0 +1,6 @@
+{
+  "name": "NeverLate AI",
+  "description": "A modern productivity web app with natural language input, smart deadline parsing, and AI-powered task prioritization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
