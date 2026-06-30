@@ -1,0 +1,5 @@
+node_modules
+.env
+neverlate.db
+.DS_Store
+dist

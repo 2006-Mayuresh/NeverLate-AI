@@ -7,8 +7,8 @@ WORKDIR /usr/src/app
 # Copy dependency definitions
 COPY package*.json ./
 
-# Install production dependencies
-RUN npm ci
+# Install production and development dependencies (needed for compiling React and esbuild)
+RUN npm ci --include=dev
 
 # Copy all source files
 COPY . .

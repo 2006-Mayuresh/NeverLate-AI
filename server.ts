@@ -24,7 +24,8 @@ db.exec(`
     avatarSeed TEXT,
     energyPreference TEXT,
     focusGoal TEXT,
-    createdAt TEXT
+    createdAt TEXT,
+    password TEXT
   );
   
   CREATE TABLE IF NOT EXISTS tasks (
@@ -64,11 +65,19 @@ db.exec(`
   );
 `);
 
+// Migration to add password column to existing DB
+try {
+  db.exec("ALTER TABLE users ADD COLUMN password TEXT;");
+} catch (e) {
+  // Ignore error if column already exists
+}
+
 // Initialize Gemini SDK with telemetry and fallback checking
 const apiKey = process.env.GEMINI_API_KEY;
 let ai: GoogleGenAI | null = null;
 
 if (apiKey) {
+  console.log("✔ GEMINI_API_KEY detected and loaded successfully.");
   ai = new GoogleGenAI({
     apiKey: apiKey,
     httpOptions: {
@@ -81,9 +90,26 @@ if (apiKey) {
   console.warn("⚠️ Warning: GEMINI_API_KEY is not defined in the environment. AI features will require configuration.");
 }
 
+// Helper function to clean markdown code fences from JSON output
+function cleanJsonResponse(text: string): string {
+  let cleaned = text.trim();
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```[a-zA-Z]*\n?/, "");
+    cleaned = cleaned.replace(/\n?```$/, "");
+  }
+  return cleaned.trim();
+}
+
 // Helper function to call generateContent with fallback models in case of high demand (503) or rate limits
 async function generateContentWithFallback(aiInstance: GoogleGenAI, params: any) {
-  const modelsToTry = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+  const modelsToTry = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+    "gemini-3.1-flash-lite"
+  ];
   let lastError: any = null;
 
   for (const modelName of modelsToTry) {
@@ -181,7 +207,8 @@ app.post("/api/gemini/parse-task", async (req, res) => {
       throw new Error("Empty response from Gemini model.");
     }
 
-    const parsedData = JSON.parse(response.text.trim());
+    const cleanedText = cleanJsonResponse(response.text);
+    const parsedData = JSON.parse(cleanedText);
     res.json(parsedData);
   } catch (err: any) {
     console.error("Error in parse-task:", err);
@@ -277,7 +304,8 @@ app.post("/api/gemini/prioritize", async (req, res) => {
       throw new Error("Empty response from Gemini model.");
     }
 
-    const parsedData = JSON.parse(response.text.trim());
+    const cleanedText = cleanJsonResponse(response.text);
+    const parsedData = JSON.parse(cleanedText);
     res.json(parsedData);
   } catch (err: any) {
     console.error("Error in prioritize:", err);
@@ -292,8 +320,8 @@ app.post("/api/gemini/prioritize", async (req, res) => {
 // Register User
 app.post("/api/users/register", (req, res) => {
   try {
-    const { name, email, energyPreference, focusGoal } = req.body;
-    if (!name || !email || !energyPreference || !focusGoal) {
+    const { name, email, energyPreference, focusGoal, password } = req.body;
+    if (!name || !email || !energyPreference || !focusGoal || !password) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -315,9 +343,9 @@ app.post("/api/users/register", (req, res) => {
     };
 
     db.prepare(`
-      INSERT INTO users (id, email, name, avatarSeed, energyPreference, focusGoal, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(newUser.id, newUser.email, newUser.name, newUser.avatarSeed, newUser.energyPreference, newUser.focusGoal, newUser.createdAt);
+      INSERT INTO users (id, email, name, avatarSeed, energyPreference, focusGoal, createdAt, password)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(newUser.id, newUser.email, newUser.name, newUser.avatarSeed, newUser.energyPreference, newUser.focusGoal, newUser.createdAt, password);
 
     res.status(201).json(newUser);
   } catch (err: any) {
@@ -329,9 +357,9 @@ app.post("/api/users/register", (req, res) => {
 // Login User
 app.post("/api/users/login", (req, res) => {
   try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: "Missing email" });
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "Missing email or password" });
     }
 
     const user = db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?)").get(email) as any;
@@ -339,10 +367,51 @@ app.post("/api/users/login", (req, res) => {
       return res.status(404).json({ message: "No user found with this email. Click \"Create account\" to sign up!" });
     }
 
+    if (user.password && user.password !== password) {
+      return res.status(401).json({ message: "Incorrect password. Please try again!" });
+    }
+
     res.json(user);
   } catch (err: any) {
     console.error("Login user error:", err);
     res.status(500).json({ error: "LOGIN_FAILED", message: err.message });
+  }
+});
+
+// Google Sign In / Registration (Google SSO mock callback)
+app.post("/api/users/google-auth", (req, res) => {
+  try {
+    const { name, email } = req.body;
+    if (!name || !email) {
+      return res.status(400).json({ error: "Missing name or email" });
+    }
+
+    // Check if user already exists
+    let user = db.prepare("SELECT * FROM users WHERE LOWER(email) = LOWER(?)").get(email) as any;
+    
+    if (!user) {
+      // Register them automatically
+      const AVATAR_SEEDS = ['Oliver', 'Sophia', 'Charlie', 'Luna', 'Felix', 'Leo', 'Milo', 'Bella', 'Ruby', 'Zoe'];
+      user = {
+        id: 'user_' + Math.random().toString(36).substring(2, 11),
+        email,
+        name,
+        avatarSeed: AVATAR_SEEDS[Math.floor(Math.random() * AVATAR_SEEDS.length)],
+        energyPreference: 'morning',
+        focusGoal: 'Optimize my daily schedule and cognitive pacing.',
+        createdAt: new Date().toISOString()
+      };
+
+      db.prepare(`
+        INSERT INTO users (id, email, name, avatarSeed, energyPreference, focusGoal, createdAt, password)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(user.id, user.email, user.name, user.avatarSeed, user.energyPreference, user.focusGoal, user.createdAt, 'google-oauth-linked');
+    }
+
+    res.json(user);
+  } catch (err: any) {
+    console.error("Google auth error:", err);
+    res.status(500).json({ error: "AUTH_FAILED", message: err.message });
   }
 });
 
@@ -373,6 +442,9 @@ app.get("/api/tasks/:userId", (req, res) => {
     const tasks = rows.map(row => ({
       ...row,
       tags: JSON.parse(row.tags || '[]'),
+      notes: row.notes || undefined,
+      completedAt: row.completedAt || undefined,
+      aiReasoning: row.aiReasoning || undefined,
       aiSubtasks: row.aiSubtasks ? JSON.parse(row.aiSubtasks) : undefined
     }));
     res.json(tasks);

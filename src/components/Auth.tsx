@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { registerUser, loginUser, getUsers } from '../services/localDb';
 import { User } from '../types';
-import { Sparkles, ArrowRight, Sun, Sunset, Moon, Target, Mail, Shield, User as UserIcon } from 'lucide-react';
+import { Sparkles, ArrowRight, Sun, Sunset, Moon, Target, Mail, Shield, User as UserIcon, Lock } from 'lucide-react';
 
 interface AuthProps {
   onAuthSuccess: (user: User) => void;
@@ -17,18 +17,56 @@ export default function Auth({ onAuthSuccess, theme, onToggleTheme }: AuthProps)
   const [focusGoal, setFocusGoal] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [password, setPassword] = useState('');
+
+  // Google Sign-In in-page modal states
+  const [showGoogleModal, setShowGoogleModal] = useState(false);
+  const [showGoogleCustomInput, setShowGoogleCustomInput] = useState(false);
+  const [googleName, setGoogleName] = useState('');
+  const [googleEmail, setGoogleEmail] = useState('');
+
+  const handleGoogleSignInClick = () => {
+    setShowGoogleModal(true);
+    setShowGoogleCustomInput(false);
+    setGoogleName('');
+    setGoogleEmail('');
+  };
+
+  const handleGoogleSelectAccount = async (gName: string, gEmail: string) => {
+    try {
+      setError('');
+      const response = await fetch('/api/users/google-auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: gName, email: gEmail })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Google authentication failed');
+      }
+      
+      const user = await response.json();
+      localStorage.setItem('neverlate_current_user', JSON.stringify(user));
+      onAuthSuccess(user);
+    } catch (e: any) {
+      setError(e.message || 'Failed to authenticate with Google.');
+      setShowGoogleModal(false);
+    }
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!email) {
-      setError('Please enter your email.');
+    if (!email || !password) {
+      setError('Please enter your email and password.');
       return;
     }
 
     try {
-      const user = await loginUser(email);
+      const user = await loginUser(email, password);
       if (user) {
         onAuthSuccess(user);
       } else {
@@ -43,13 +81,13 @@ export default function Auth({ onAuthSuccess, theme, onToggleTheme }: AuthProps)
     e.preventDefault();
     setError('');
 
-    if (!email || !name || !focusGoal) {
+    if (!email || !name || !focusGoal || !password) {
       setError('All fields are required.');
       return;
     }
 
     try {
-      const user = await registerUser(name, email, energyPreference, focusGoal);
+      const user = await registerUser(name, email, energyPreference, focusGoal, password);
       setSuccess('Account created successfully!');
       setTimeout(() => {
         onAuthSuccess(user);
@@ -67,7 +105,8 @@ export default function Auth({ onAuthSuccess, theme, onToggleTheme }: AuthProps)
         'Demo User',
         `demo_${randomId}@neverlate.ai`,
         'morning',
-        'Pass my university finals and optimize my daily study schedule.'
+        'Pass my university finals and optimize my daily study schedule.',
+        'demo123'
       );
       onAuthSuccess(trialUser);
     } catch (e: any) {
@@ -119,7 +158,7 @@ export default function Auth({ onAuthSuccess, theme, onToggleTheme }: AuthProps)
           {/* Tabs */}
           <div className="flex border border-slate-100 mb-8 p-1 bg-slate-100/60 rounded-2xl">
             <button
-              onClick={() => { setIsSignUp(false); setError(''); }}
+              onClick={() => { setIsSignUp(false); setError(''); setPassword(''); }}
               className={`flex-1 text-center py-2.5 text-xs font-bold rounded-xl transition-all duration-300 cursor-pointer ${
                 !isSignUp 
                   ? 'bg-white text-slate-900 shadow-md' 
@@ -129,7 +168,7 @@ export default function Auth({ onAuthSuccess, theme, onToggleTheme }: AuthProps)
               Sign In
             </button>
             <button
-              onClick={() => { setIsSignUp(true); setError(''); }}
+              onClick={() => { setIsSignUp(true); setError(''); setPassword(''); }}
               className={`flex-1 text-center py-2.5 text-xs font-bold rounded-xl transition-all duration-300 cursor-pointer ${
                 isSignUp 
                   ? 'bg-white text-slate-900 shadow-md' 
@@ -178,12 +217,49 @@ export default function Auth({ onAuthSuccess, theme, onToggleTheme }: AuthProps)
               </div>
 
               <div>
+                <label htmlFor="signin-password" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Password
+                </label>
+                <div className="relative rounded-2xl">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+                    <Lock className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <input
+                    id="signin-password"
+                    name="password"
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="block w-full rounded-2xl border border-slate-200 py-3 pl-11 pr-4 text-sm text-slate-900 placeholder-slate-400 outline-none transition-all duration-300 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100/50 focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
                 <button
                   type="submit"
                   className="btn-animate flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-teal-600 via-cyan-600 to-teal-500 py-3.5 px-4 text-sm font-bold text-white shadow-lg shadow-teal-100/60 active:scale-95 cursor-pointer"
                 >
                   Sign In
                   <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={handleGoogleSignInClick}
+                  className="btn-animate flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 py-3.5 px-4 text-sm font-bold text-slate-700 shadow-sm cursor-pointer transition-all duration-200"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+                  </svg>
+                  Continue with Google
                 </button>
               </div>
             </form>
@@ -232,6 +308,28 @@ export default function Auth({ onAuthSuccess, theme, onToggleTheme }: AuthProps)
                       className="block w-full rounded-2xl border border-slate-200 py-3 pl-11 pr-4 text-sm text-slate-900 placeholder-slate-400 outline-none transition-all duration-300 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100/50 focus:bg-white"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <label htmlFor="signup-password" className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+                    <Lock className="h-5 w-5 text-slate-400" />
+                  </div>
+                  <input
+                    id="signup-password"
+                    name="password"
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="block w-full rounded-2xl border border-slate-200 py-3 pl-11 pr-4 text-sm text-slate-900 placeholder-slate-400 outline-none transition-all duration-300 focus:border-cyan-500 focus:ring-4 focus:ring-cyan-100/50 focus:bg-white"
+                  />
                 </div>
               </div>
 
@@ -319,6 +417,22 @@ export default function Auth({ onAuthSuccess, theme, onToggleTheme }: AuthProps)
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
+
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={handleGoogleSignInClick}
+                  className="btn-animate flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 hover:border-slate-350 bg-white hover:bg-slate-50 py-3.5 px-4 text-sm font-bold text-slate-700 shadow-sm cursor-pointer transition-all duration-200"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
+                  </svg>
+                  Create Account with Google
+                </button>
+              </div>
             </form>
           )}
 
@@ -341,6 +455,135 @@ export default function Auth({ onAuthSuccess, theme, onToggleTheme }: AuthProps)
             Launch Instant Demo Account
           </button>
 
+          {/* Google Authentication Modal Overlay */}
+          {showGoogleModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+              <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40" onClick={() => setShowGoogleModal(false)} />
+              
+              <div className="relative w-full max-w-md bg-white dark:bg-slate-950 rounded-3xl shadow-2xl border border-slate-100 dark:border-slate-900 z-50 p-8 text-center animate-in zoom-in-95 duration-200">
+                {/* Google Logo */}
+                <div className="flex justify-center mb-6">
+                  <svg className="h-6" viewBox="0 0 74 24" width="75" height="24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12.24 10.285V14.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.866-3.577-7.866-8s3.536-8 7.866-8c2.46 0 4.105 1.025 5.047 1.926l3.245-3.125C18.465 1.908 15.63 0 12.24 0 5.48 0 0 5.37 0 12s5.48 12 12.24 12c7.058 0 11.758-4.887 11.758-11.77 0-.79-.086-1.393-.19-1.945H12.24z" fill="#4285F4"/>
+                    <path d="M33.456 8.243c-3.792 0-6.837 2.87-6.837 6.757s3.045 6.757 6.837 6.757c3.793 0 6.838-2.87 6.838-6.757S37.25 8.243 33.456 8.243zm0 10.743c-2.124 0-3.957-1.737-3.957-3.986s1.833-3.986 3.957-3.986c2.124 0 3.957 1.737 3.957 3.986s-1.833 3.986-3.957 3.986z" fill="#EA4335"/>
+                    <path d="M49.49 8.243c-3.792 0-6.838 2.87-6.838 6.757s3.046 6.757 6.838 6.757c3.793 0 6.838-2.87 6.838-6.757s-3.045-6.757-6.838-6.757zm0 10.743c-2.124 0-3.957-1.737-3.957-3.986s1.833-3.986 3.957-3.986c2.124 0 3.957 1.737 3.957 3.986s-1.833 3.986-3.957 3.986z" fill="#F9BC05"/>
+                    <path d="M65.056 8.243c-3.67 0-6.666 2.92-6.666 6.757 0 3.803 2.996 6.757 6.666 6.757 2.22 0 3.526-.887 4.317-1.815V21c0 2.576-1.41 3.97-3.684 3.97-1.858 0-3.012-1.31-3.442-2.4l-3.593 1.487C59.697 26.545 61.9 29 65.688 29c4.2 0 7.76-2.435 7.76-8.835V8.65h-4.07v1.58c-.91-.974-2.316-1.987-4.322-1.987zm.4 10.743c-2.073 0-3.717-1.737-3.717-3.986s1.644-3.986 3.717-3.986c2.073 0 3.65 1.737 3.65 3.986s-1.577 3.986-3.65 3.986z" fill="#4285F4"/>
+                  </svg>
+                </div>
+
+                {!showGoogleCustomInput ? (
+                  <div className="space-y-4">
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 font-sans">Choose an account</h3>
+                    <p className="text-xs text-slate-500 font-medium">to continue to NeverLate AI</p>
+
+                    {/* Account list */}
+                    <div className="text-left mt-6 divide-y divide-slate-100 dark:divide-slate-900">
+                      <button
+                        type="button"
+                        onClick={() => handleGoogleSelectAccount('Mayuresh Kharat', 'mayuresh.kharat@gmail.com')}
+                        className="w-full flex items-center gap-3 py-3.5 px-2.5 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-2xl transition-all cursor-pointer text-left border border-transparent"
+                      >
+                        <div className="h-9 w-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                          M
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-black text-slate-800 dark:text-slate-200">Mayuresh Kharat</div>
+                          <div className="text-[10px] font-bold text-slate-400 truncate">mayuresh.kharat@gmail.com</div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleGoogleSelectAccount('Demo Tester', 'demo.tester@gmail.com')}
+                        className="w-full flex items-center gap-3 py-3.5 px-2.5 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-2xl transition-all cursor-pointer text-left border border-transparent"
+                      >
+                        <div className="h-9 w-9 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                          D
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-black text-slate-800 dark:text-slate-200">Demo Tester</div>
+                          <div className="text-[10px] font-bold text-slate-400 truncate">demo.tester@gmail.com</div>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowGoogleCustomInput(true)}
+                        className="w-full flex items-center gap-3 py-3.5 px-2.5 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-2xl transition-all cursor-pointer text-left border border-transparent"
+                      >
+                        <div className="h-9 w-9 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-500 flex items-center justify-center font-bold text-lg shrink-0">
+                          +
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-black text-blue-600 dark:text-blue-400">Use another account</div>
+                          <div className="text-[10px] font-bold text-slate-400">Sign in with a different email</div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-left space-y-4">
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 font-sans text-center">Google Sign in</h3>
+                    
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (googleName && googleEmail) {
+                          handleGoogleSelectAccount(googleName, googleEmail);
+                        }
+                      }}
+                      className="space-y-4 pt-4"
+                    >
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 pl-0.5">Full Name</label>
+                        <input
+                          type="text"
+                          required
+                          value={googleName}
+                          onChange={(e) => setGoogleName(e.target.value)}
+                          placeholder="Jane Doe"
+                          className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 p-3 text-xs text-slate-800 dark:text-slate-200 bg-transparent outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/50"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 pl-0.5">Google Email Address</label>
+                        <input
+                          type="email"
+                          required
+                          value={googleEmail}
+                          onChange={(e) => setGoogleEmail(e.target.value)}
+                          placeholder="name@gmail.com"
+                          className="w-full rounded-2xl border border-slate-200 dark:border-slate-800 p-3 text-xs text-slate-800 dark:text-slate-200 bg-transparent outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100/50"
+                        />
+                      </div>
+
+                      <div className="flex justify-between items-center pt-4">
+                        <button
+                          type="button"
+                          onClick={() => setShowGoogleCustomInput(false)}
+                          className="text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
+                        >
+                          Back
+                        </button>
+                        
+                        <button
+                          type="submit"
+                          className="rounded-2xl bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 text-xs font-bold cursor-pointer transition-colors shadow-md"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
+                <div className="text-[10px] text-slate-400 mt-8 leading-relaxed">
+                  To continue, Google will share your name, email address, language preference, and profile picture with NeverLate AI.
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

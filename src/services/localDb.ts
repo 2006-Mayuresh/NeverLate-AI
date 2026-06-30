@@ -59,14 +59,15 @@ export async function registerUser(
   name: string,
   email: string,
   energyPreference: 'morning' | 'afternoon' | 'evening',
-  focusGoal: string
+  focusGoal: string,
+  password?: string
 ): Promise<User> {
   const response = await fetch('/api/users/register', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ name, email, energyPreference, focusGoal }),
+    body: JSON.stringify({ name, email, energyPreference, focusGoal, password }),
   });
 
   if (!response.ok) {
@@ -79,13 +80,13 @@ export async function registerUser(
   return user;
 }
 
-export async function loginUser(email: string): Promise<User | null> {
+export async function loginUser(email: string, password?: string): Promise<User | null> {
   const response = await fetch('/api/users/login', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, password }),
   });
 
   if (response.status === 404) {
